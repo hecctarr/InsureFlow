@@ -3,7 +3,7 @@ import time
 import base64
 import pandas as pd
 import requests
-import pypdf 
+import PyPDF2
 import json
 import re
 import streamlit.components.v1 as components
@@ -13,7 +13,7 @@ ILMU_API_KEY = "sk-e31a89184e45c6585eb1f92051003f3669ebd80fc9ae2f56"
 ILMU_ENDPOINT = "https://api.ilmu.ai/v1/chat/completions" 
 MODEL_NAME = "ilmu-glm-5.1" 
 
-# --- 1. SESSION STATE MANAGER ---
+# --- 1. SESSION STATE ---
 if 'phase' not in st.session_state:
     st.session_state.phase = 'landing'
 
@@ -32,7 +32,7 @@ def get_base64(bin_file):
     except: return ""
 img_base64 = get_base64('family.jpg')
 
-# --- 4. ULTIMATE CSS ---
+# --- 4. CSS ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -60,14 +60,17 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 5. THE PURE AGENTIC ENGINE ---
+# --- 5. PURE AGENTIC ENGINE ---
 def local_neural_fallback(text):
     t = text.upper()
+    # Dynamic Pattern Scanning 
     name_m = re.search(r"(?:NAME|PATIENT)[:\s]*([A-Z\s]{3,30})", t)
     patient = name_m.group(1).strip().title() if name_m else "Policy Holder"
-    diag_m = re.search(r"(?:DIAGNOSIS|CONDITION|IMPRESSION)[:\s]*([A-Z\s]{3,50})", t)
-    diag = diag_m.group(1).strip().title() if diag_m else "Medical Procedure"
     
+    diag_m = re.search(r"(?:DIAGNOSIS|CONDITION)[:\s]*([A-Z\s]{3,50})", t)
+    diag = diag_m.group(1).strip().title() if diag_m else "Medical Case"
+    
+    # Improved price scanner to prevent ValueError
     prices = re.findall(r"RM\s*([\d,]+\.?\d*)", t)
     try:
         val = float(prices[0].replace(',', '')) if (prices and prices[0].replace('.','').isdigit()) else 5000.0
@@ -77,7 +80,7 @@ def local_neural_fallback(text):
     return {
         "name": patient, "diag": diag, "match": "94%", 
         "ded": "RM 300.00", "pay": f"RM {val - 300:,.2f}", "status": "ELIGIBLE",
-        "rep": f"Agentic scan identified {diag} for {patient}. Verified via Local Reasoning Engine.",
+        "rep": f"Autonomous logic scan complete. Identified {diag} for {patient}. Please check API connection for precise policy verification.",
         "email": f"Subject: Claim Submission - {patient}\n\nDear Agent,\nI am submitting a claim for {diag}. Verified payout RM {val-300:,.2f}.",
         "chart": {"Hospital": val*0.7, "Pharmacy": val*0.2, "Misc": val*0.1}, "src": "🛡️ Agentic Local"
     }
@@ -91,7 +94,19 @@ def call_pure_ai_agent(med_txt, pol_txt, is_image):
     3. Determine if ELIGIBLE or REJECTED.
     4. Calculate Total Payout.
     5. Draft a professional claim email for the agent.
-    Output MUST be a valid JSON only."""
+
+    Output MUST be a valid JSON only:
+    {
+      "name": "Full Name",
+      "diagnosis": "Diagnosis Name",
+      "accuracy": "Match %",
+      "status": "ELIGIBLE or REJECTED",
+      "deductible": "RM value from Policy",
+      "payout": "RM Total Payout",
+      "reasoning": "Brief logic summary",
+      "email_draft": "Subject: ... Dear Agent...",
+      "chart": {"Surgery": 3000, "Meds": 1000}
+    }"""
 
     content = [{"type": "text", "text": instruction}]
     if is_image:
@@ -143,23 +158,18 @@ else:
     st.markdown(f'<div style="background-image: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url(\'data:image/png;base64,{img_base64}\'); background-size:cover; padding:50px; border-radius:25px; text-align:center; margin-bottom:30px;"><h1 style="font-size:45px;font-weight:800;color:white;margin:0;">Command Center</h1><p style="color:#00d4ff;">Autonomous Multi-Modal Agentic Processing</p></div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2)
-    with col1: med_file = st.file_uploader("Upload Medical Evidence", type=["pdf","jpg","png","jpeg"], key="m")
-    with col2: pol_file = st.file_uploader("Upload Policy", type=["pdf"], key="p")
+    with col1: med_file = st.file_uploader("Upload Medical Evidence", type=["pdf","jpg","png","jpeg"])
+    with col2: pol_file = st.file_uploader("Upload Policy", type=["pdf"])
 
     if st.button("🚀 INITIATE AGENTIC FLOW ⌃ ↵"):
         if med_file and pol_file:
             with st.status("🧠 Agent is reasoning...", expanded=True) as status:
                 is_img = med_file.type != "application/pdf"
                 if not is_img:
-                    # FIX: Panggil pypdf.PdfReader
-                    reader = pypdf.PdfReader(med_file)
-                    m_data = "".join([p.extract_text() for p in reader.pages])
+                    m_data = "".join([p.extract_text() for p in PyPDF2.PdfReader(med_file).pages])
                 else: m_data = base64.b64encode(med_file.read()).decode('utf-8')
                 
-                # FIX: Panggil pypdf.PdfReader
-                reader_p = pypdf.PdfReader(pol_file)
-                p_data = "".join([p.extract_text() for p in reader_p.pages])
-
+                p_data = "".join([p.extract_text() for p in PyPDF2.PdfReader(pol_file).pages])
                 res = call_pure_ai_agent(m_data, p_data, is_img)
                 status.update(label=f"Complete! (Engine: {res['src']})", state="complete", expanded=False)
 
@@ -167,8 +177,13 @@ else:
             st.markdown(f"### 📊 Strategic Analysis: {res['name']}")
             m1, m2, m3, m4 = st.columns(4)
             m1.metric("Match Accuracy", res['match'], delta="Verified")
+            
+            # DEDUCTIBLE MERAH 
             m2.metric("Deductible", res['ded'], delta="-Applied", delta_color="inverse")
+            
             m3.metric("Est. Payout", res['pay'], delta="Ready")
+            
+            # STATUS DINAMIK
             st_val = res.get('status', 'ELIGIBLE')
             m4.metric("Status", st_val, delta=res['src'], delta_color="normal" if st_val == "ELIGIBLE" else "inverse")
 
@@ -183,8 +198,9 @@ else:
                 df = pd.DataFrame({"Item": list(res['chart'].keys()), "Amount": list(res['chart'].values())})
                 st.bar_chart(df, x="Item", y="Amount", color="#007BFF")
             with t3:
-                st.markdown("#### AI-Generated Draft for your Insurance Agent")
+                st.markdown("#### **AI-Generated Draft for your Insurance Agent**")
                 st.code(res.get('email', "Draft not available."), language="text")
+                st.caption("Copy the text above and send it to your insurance agent.")
         else:
             st.error("Upload both files first!")
 
