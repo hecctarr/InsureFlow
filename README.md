@@ -2,7 +2,7 @@
 
 Decision Intelligence for Insurance Claims — powered by GLM (ilmu.ai)
 
-NOTE: You can view Demo video [here]([https://youtu.be/xF5qp4EL0WA?si=Zowxb9eKPryKcYYI](https://youtu.be/oXlBXe6Vc2A?si=w-_upsvbISV6oOmZ)).
+NOTE: You can view Demo video [here](https://youtu.be/oXlBXe6Vc2A?si=w-_upsvbISV6oOmZ).
 
 ## How to Run
 
